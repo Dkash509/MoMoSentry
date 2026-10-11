@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.streamlit/secrets.toml
+# Raw data is NEVER committed (the full PaySim CSV is ~470 MB)
+data/*
+!data/.gitkeep
+.agents/
+.claude/
