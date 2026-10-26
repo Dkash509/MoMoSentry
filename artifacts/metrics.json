@@ -27,7 +27,7 @@
       "precision_at_top_1000": 0.994,
       "fpr_at_threshold": 0.005180080595008286,
       "reference_rate": 0.0009505086067806235,
-      "pr_auc_adj": 0.48642489938573064,
+      "pr_auc_adj": 0.4864248993857307,
       "precision_at_threshold_adj": 0.08423636988278992
     },
     "isFlaggedFraud rule": {
@@ -86,15 +86,15 @@
       "precision_at_top_1000": 0.994,
       "fpr_at_threshold": 0.005180080595008286,
       "reference_rate": 0.0009505086067806235,
-      "pr_auc_adj": 0.48642489938573064,
+      "pr_auc_adj": 0.4864248993857307,
       "precision_at_threshold_adj": 0.08423636988278992
     },
     "Local Outlier Factor": {
       "n": 280613,
       "n_fraud": 2432,
       "base_rate": 0.008666740314953335,
-      "roc_auc": 0.6537533028240416,
-      "pr_auc": 0.08099965608393075,
+      "roc_auc": 0.6537533116927469,
+      "pr_auc": 0.0809996562744196,
       "alert_rate": 0.0092155388381864,
       "precision_at_threshold": 0.19605568445475638,
       "recall_at_threshold": 0.20847039473684212,
@@ -105,7 +105,7 @@
       "precision_at_top_1000": 0.142,
       "fpr_at_threshold": 0.007473551392798214,
       "reference_rate": 0.0009505086067806235,
-      "pr_auc_adj": 0.01025395041107325,
+      "pr_auc_adj": 0.010253950432183693,
       "precision_at_threshold_adj": 0.02585299798647842
     },
     "isFlaggedFraud rule": {
@@ -325,6 +325,90 @@
     "n_fraud": 2432,
     "fraud_caught_by_any": 2432,
     "fraud_caught_by_none": 0
+  },
+  "run": {
+    "train_steps": [
+      1,
+      520
+    ],
+    "holdout_steps": [
+      521,
+      743
+    ],
+    "feature_names": [
+      "type_CASH_IN",
+      "type_CASH_OUT",
+      "type_DEBIT",
+      "type_PAYMENT",
+      "type_TRANSFER",
+      "log_amount",
+      "hour_sin",
+      "hour_cos",
+      "log_old_org",
+      "amount_to_balance",
+      "orig_emptied",
+      "err_orig",
+      "err_dest",
+      "dest_zero_both",
+      "dest_is_merchant"
+    ],
+    "label_first_used": "evaluation stage",
+    "alert_budgets": [
+      0.001,
+      0.0025,
+      0.005,
+      0.01,
+      0.02
+    ],
+    "isolation_forest": {
+      "params": {
+        "n_estimators": 200,
+        "max_samples": 256,
+        "n_jobs": -1,
+        "random_state": 42
+      },
+      "fit_rows": 6082007,
+      "max_rows_seen": 51200,
+      "calibration_rows": 200000,
+      "threshold": 0.6143331865227984
+    },
+    "local_outlier_factor": {
+      "params": {
+        "n_neighbors": 35,
+        "novelty": true,
+        "n_jobs": -1
+      },
+      "fit_rows": 100000,
+      "fit_sampled_by": "transaction type (never the fraud label)",
+      "calibration_rows": 50000,
+      "fit_calibration_overlap": 0,
+      "threshold": 2.0984859466552734,
+      "scored_rows": 280613,
+      "alerts_complete": true,
+      "type_mix": {
+        "CASH_OUT": {
+          "train_share": 0.35303099782686864,
+          "lof_sample_share": 0.35303
+        },
+        "PAYMENT": {
+          "train_share": 0.3376664972598683,
+          "lof_sample_share": 0.33767
+        },
+        "CASH_IN": {
+          "train_share": 0.21957390052329764,
+          "lof_sample_share": 0.21957
+        },
+        "TRANSFER": {
+          "train_share": 0.08329355753783249,
+          "lof_sample_share": 0.08329
+        },
+        "DEBIT": {
+          "train_share": 0.006435046852132857,
+          "lof_sample_share": 0.00644
+        }
+      }
+    },
+    "export_rows": 45902
   },
   "if_by_type": {
     "TRANSFER": {

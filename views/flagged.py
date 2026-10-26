@@ -1,6 +1,6 @@
 import streamlit as st
 
-from app_common import load_bundle, load_parquet, pct
+from app_common import load_bundle, load_json, load_parquet, pct
 from momosentry.config import TX_TYPES
 from momosentry.explain import explain
 
@@ -20,6 +20,16 @@ def page_flagged():
     mask = {"Either model": df.if_alert | df.lof_alert, "Isolation Forest": df.if_alert,
             "Local Outlier Factor": df.lof_alert, "Both models": df.if_alert & df.lof_alert}[model]
     view = df[mask & df["type"].astype(str).isin(types) & (df.if_pct >= min_pct)].sort_values("if_score", ascending=False)
+
+    m = load_json("metrics.json")
+    run = m.get("run")
+    if run and run["local_outlier_factor"]["alerts_complete"]:
+        iso_n, lof_n = m["full_holdout"]["Isolation Forest"], m["comparison_set"]["Local Outlier Factor"]
+        st.caption(f"On the whole holdout, Isolation Forest raised {iso_n['tp'] + iso_n['fp']:,} alerts and "
+                   f"Local Outlier Factor {lof_n['tp'] + lof_n['fp']:,}. This table holds every one of them.")
+    else:
+        st.warning("This table holds every Isolation Forest alert but only some Local Outlier Factor alerts. "
+                   "Re-run `python scripts/train_and_evaluate.py` to include all of them.")
 
     c = st.columns(3)
     c[0].metric("Flagged", f"{len(view):,}")
