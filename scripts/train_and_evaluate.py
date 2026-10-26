@@ -72,7 +72,7 @@ def main():
     path = args.data or (config.PARQUET if config.PARQUET.exists() else config.SAMPLE_PARQUET)
     df = data.load(path)
     source = "synthetic_sample" if path.resolve() == config.SAMPLE_PARQUET.resolve() else "paysim"
-    log(f"loaded {len(df):,} rows ({source}), fraud rate {df.isFraud.mean():.4%}")
+    log(f"loaded {len(df):,} rows ({source})")  # no label read before the evaluation stage
 
     train, holdout, cut = data.time_split(df)
     del df  # the split made copies; free the full table so it is not held twice
@@ -95,6 +95,7 @@ def main():
     log(f"fitted LOF on {len(lof_fit_rows):,} type-stratified train rows")
     remaining = np.setdiff1d(np.arange(len(train)), lof_fit_rows)
     lof_cal_rows = rng.choice(remaining, size=min(50_000, len(remaining)), replace=False)
+    assert np.intersect1d(lof_fit_rows, lof_cal_rows).size == 0  # fit and threshold rows never overlap
     cal_lof = Calibration.from_train_scores(anomaly_score(lof, X_train.iloc[lof_cal_rows]))
     log("calibrated both models on train-period scores")
 
@@ -118,11 +119,17 @@ def main():
     cmp_idx = np.sort(rng.choice(len(holdout), size=n_cmp, replace=False))
     lof_cmp = anomaly_score(lof, X_hold.iloc[cmp_idx])
     log(f"scored {n_cmp:,} holdout rows with LOF")
+    # LOF alert flag for every holdout row. cmp_idx holds the positions LOF scored, so the
+    # flags land on the right rows; rows LOF did not score stay False. The alert list is
+    # only complete when LOF scored the whole holdout (LOF_EVAL_MAX >= holdout size).
+    lof_alert_hold = np.zeros(len(holdout), dtype=bool)
+    lof_alert_hold[cmp_idx] = lof_cmp > cal_lof.threshold
+    lof_alerts_complete = bool(n_cmp == len(holdout))
 
     y_cmp = y_hold[cmp_idx]
     ref = float(train["isFraud"].mean())  # prevalence the detector faces in normal operation
     log(f"fraud rate: train {ref:.4%}, holdout {y_hold.mean():.4%}")
-    flagged = holdout["isFlaggedFraud"].to_numpy().astype(float)
+    flagged = rules.supplied_flag(holdout)  # baseline 1: PaySim's own indicator
     drain = rules.balance_drain(holdout)  # 1.0 where an outgoing tx empties the sender
     metrics = {
         "meta": bundle.meta | {"holdout_rows": int(len(holdout)), "comparison_rows": int(n_cmp),
@@ -153,6 +160,37 @@ def main():
             "Balance-drain rule": drain[cmp_idx] == 1,
         }, y_cmp),
     }
+    # Run facts shown by the dashboard (Method panel, model cards). Writing them here
+    # means the screen shows what the pipeline actually did, not what the report claims.
+    train_mix = train["type"].value_counts(normalize=True)
+    lof_mix = train["type"].iloc[lof_fit_rows].value_counts(normalize=True)
+    metrics["run"] = {
+        "train_steps": [int(train["step"].min()), int(train["step"].max())],
+        "holdout_steps": [int(holdout["step"].min()), int(holdout["step"].max())],
+        "feature_names": list(X_train.columns),
+        "label_first_used": "evaluation stage",
+        "alert_budgets": list(config.ALERT_BUDGETS),
+        "isolation_forest": {
+            "params": dict(config.IF_PARAMS) | {"random_state": config.RANDOM_STATE},
+            "fit_rows": int(len(train)),
+            # each tree sees max_samples rows, so the forest sees at most this many distinct rows
+            "max_rows_seen": int(min(len(train), config.IF_PARAMS["n_estimators"] * config.IF_PARAMS["max_samples"])),
+            "calibration_rows": int(len(cal_idx)),
+            "threshold": float(cal_if.threshold),
+        },
+        "local_outlier_factor": {
+            "params": dict(config.LOF_PARAMS),
+            "fit_rows": int(len(lof_fit_rows)),
+            "fit_sampled_by": "transaction type (never the fraud label)",
+            "calibration_rows": int(len(lof_cal_rows)),
+            "fit_calibration_overlap": int(np.intersect1d(lof_fit_rows, lof_cal_rows).size),
+            "threshold": float(cal_lof.threshold),
+            "scored_rows": int(n_cmp),
+            "alerts_complete": lof_alerts_complete,
+            "type_mix": {str(t): {"train_share": float(train_mix.get(t, 0.0)),
+                                  "lof_sample_share": float(lof_mix.get(t, 0.0))} for t in train_mix.index},
+        },
+    }
     # Per-type breakdown for IF (where does it work, where does it fail?)
     metrics["if_by_type"] = {}
     for t in holdout["type"].astype(str).unique():
@@ -166,7 +204,6 @@ def main():
         "Isolation Forest": curves(y_cmp, if_hold[cmp_idx]),
         "Local Outlier Factor": curves(y_cmp, lof_cmp),
     }
-    (out / "metrics.json").write_text(json.dumps(metrics, indent=2))
     (out / "curves.json").write_text(json.dumps(curve_data))
 
     # ---------------- Dashboard export ----------------
@@ -175,8 +212,11 @@ def main():
                                         fraud=("fraud", "sum")).reset_index()
     hourly.to_parquet(out / "hourly.parquet", index=False)
 
-    # Small slice for the tables: every alert + every fraud + random normal rows.
-    keep = (if_hold > cal_if.threshold) | (y_hold == 1) | (flagged == 1)
+    # Small slice for the tables: every alert from BOTH detectors + every fraud + every
+    # isFlaggedFraud row + random normal rows. Fraud rows are included on purpose so the
+    # table can show misses, which means this file is NOT a representative sample: every
+    # count on the dashboard comes from metrics.json, never from counting rows here.
+    keep = (if_hold > cal_if.threshold) | lof_alert_hold | (y_hold == 1) | (flagged == 1)
     normal_pool = np.flatnonzero(~keep)
     extra = rng.choice(normal_pool, size=min(config.EXPORT_NORMAL_ROWS, len(normal_pool)), replace=False)
     rows = np.sort(np.concatenate([np.flatnonzero(keep), extra]))
@@ -186,6 +226,8 @@ def main():
     export = pd.concat([export, bundle.score_raw(holdout.iloc[rows].reset_index(drop=True))], axis=1)
     export.to_parquet(out / "holdout_scored.parquet", index=False)
     log(f"exported {len(export):,} scored rows for the dashboard")
+    metrics["run"]["export_rows"] = int(len(export))
+    (out / "metrics.json").write_text(json.dumps(metrics, indent=2))
 
     for name, m in metrics["comparison_set"].items():
         log(f"{name:22s} ROC-AUC {m['roc_auc'] or 0:.3f}  PR-AUC {m['pr_auc'] or 0:.3f}  "

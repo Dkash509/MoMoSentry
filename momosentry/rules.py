@@ -18,6 +18,16 @@ import pandas as pd
 RULE_NAMES = {"drain": "Balance-drain rule", "flagged": "isFlaggedFraud rule"}
 
 
+def supplied_flag(df: pd.DataFrame) -> np.ndarray:
+    """1.0 where PaySim's own `isFlaggedFraud` indicator is set, else 0.0.
+
+    This is baseline 1. PaySim supplies it (a transfer above 200,000), so nothing
+    is learned or tuned here: it is a column read, kept in this module so that
+    both baselines sit together. It is NOT the fraud label `isFraud`.
+    """
+    return df["isFlaggedFraud"].to_numpy(dtype=float)
+
+
 def balance_drain(df: pd.DataFrame) -> np.ndarray:
     """1.0 if an outgoing transaction leaves the sender with exactly 0, else 0.0.
 
