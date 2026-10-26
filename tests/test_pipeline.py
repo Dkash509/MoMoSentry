@@ -44,5 +44,21 @@ def test_end_to_end(tmp_path, monkeypatch):
     bundle = Bundle.load(out / "model_bundle.joblib")
     exp = pd.read_parquet(out / "holdout_scored.parquet")
     assert {"if_pct", "lof_pct", "if_alert"} <= set(exp.columns)
+
+    # Run facts that the dashboard shows must exist and be consistent.
+    run = m["run"]
+    assert run["train_steps"][1] < run["holdout_steps"][0]
+    assert len(run["feature_names"]) == 15
+    assert not {"isFraud", "isFlaggedFraud"} & set(run["feature_names"])
+    assert run["local_outlier_factor"]["fit_calibration_overlap"] == 0
+
+    # The export must hold EVERY alert of both detectors, so the flagged page is complete.
+    # The totals come from metrics.json, which was computed on the full holdout.
+    iso = m["full_holdout"]["Isolation Forest"]
+    assert int(exp["if_alert"].sum()) == iso["tp"] + iso["fp"]
+    assert run["local_outlier_factor"]["alerts_complete"]
+    lof = m["comparison_set"]["Local Outlier Factor"]
+    assert int(exp["lof_alert"].sum()) == lof["tp"] + lof["fp"]
+    assert run["export_rows"] == len(exp)
     ex = explain(bundle, exp.iloc[[0]], "if")
     assert len(ex) == 6 and abs(ex.share.sum() - 1) < 1e-6 or ex.share.sum() == 0
