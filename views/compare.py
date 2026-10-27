@@ -102,8 +102,12 @@ def page_compare():
     st.title("Model comparison")
     m = load_json("metrics.json")
     source_banner(m)
-    st.caption(f"All four methods are scored on the same {m['meta']['comparison_rows']:,} holdout rows "
-               "(a uniform random sample, so the fraud base rate is unchanged).")
+    meta = m["meta"]
+    # LOF can be limited to a random sample of the holdout (config.LOF_EVAL_MAX). When it scored
+    # every holdout row, the comparison set IS the holdout, so the caption must not call it a sample.
+    scope = ("the whole holdout" if meta["comparison_rows"] == meta.get("holdout_rows")
+             else "a uniform random sample of the holdout, so the fraud base rate is unchanged")
+    st.caption(f"All four methods are scored on the same {meta['comparison_rows']:,} holdout rows ({scope}).")
     model_cards(m)
     cmp = m["comparison_set"]
     k = next(key for key in next(iter(cmp.values())) if key.startswith("precision_at_top_"))
@@ -116,7 +120,6 @@ def page_compare():
                            "TP": v["tp"], "FP": v["fp"], "FN": v["fn"]} for name, v in cmp.items()])
     st.dataframe(table, hide_index=True, width="stretch",
                  column_config={c: st.column_config.NumberColumn(format="%.3f") for c in table.columns[1:8]})
-    meta = m["meta"]
     if "train_fraud_rate" in meta:
         st.info(f"**Base-rate shift.** Fraud is {meta['holdout_fraud_rate']:.2%} of the holdout period but only "
                 f"{meta['train_fraud_rate']:.3%} of the training period: PaySim's normal traffic collapses in the late "
@@ -155,7 +158,8 @@ def page_compare():
             "- **@ alert** metrics use a threshold set on training-period scores so that ~"
             f"{m['meta']['alert_rate']:.1%} of traffic is flagged, which represents the analyst's review budget.\n"
             "- `isFlaggedFraud` is PaySim's built-in rule (large transfers). It is precise but catches almost nothing.\n"
-            "- The balance-drain rule flags any outgoing transaction that leaves the sender at exactly 0.\n"
+            "- The balance-drain rule flags any outgoing (non-CASH_IN) transaction that takes a sender who "
+            "held money down to exactly 0.\n"
             "- No model saw `isFraud` during training, and no setting was tuned on the holdout.")
 
 

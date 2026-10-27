@@ -3,8 +3,8 @@
 A rule is a fixed yes/no test written by hand, with no learning. The project
 compares the two unsupervised detectors against two of them:
 
-1. PaySim's own `isFlaggedFraud` column (transfers above 200,000). That one is
-   already in the data, so there is nothing to compute here.
+1. PaySim's own `isFlaggedFraud` column (transfers above 200,000). It is
+   already in the data, so `supplied_flag` only reads it and computes nothing.
 2. A balance-drain rule, defined below.
 
 Like features.py, a rule may only read the transaction's own fields. It never
@@ -29,7 +29,7 @@ def supplied_flag(df: pd.DataFrame) -> np.ndarray:
 
 
 def balance_drain(df: pd.DataFrame) -> np.ndarray:
-    """1.0 if an outgoing transaction leaves the sender with exactly 0, else 0.0.
+    """1.0 if an outgoing transaction takes a sender who held money down to exactly 0, else 0.0.
 
     "Outgoing" means every type except CASH_IN, because CASH_IN puts money INTO
     the sender's account and so can never empty it.
