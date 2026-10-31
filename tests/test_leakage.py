@@ -29,6 +29,25 @@ def test_type_sample_never_uses_label():
     assert "isFraud" not in src
 
 
+def test_timeline_reads_only_the_step_column():
+    # The split timeline (FR1) must carry no label information, whether it is built
+    # by the training script or by the stand-alone make_timeline.py.
+    for src in (inspect.getsource(data.step_timeline),
+                (SCRIPT.parent / "make_timeline.py").read_text(encoding="utf-8")):
+        assert not LABEL_READ.search(src) and not FLAG_READ.search(src)
+    assert 'columns=["step"]' in (SCRIPT.parent / "make_timeline.py").read_text(encoding="utf-8")
+
+
+def test_timeline_counts_match_the_time_split():
+    df = generate(20_000)
+    train, hold, cut = data.time_split(df)
+    tl = data.step_timeline(df["step"], cut)
+    assert tl["transactions"].sum() == len(df)
+    assert tl.loc[tl.period == "Fitting", "transactions"].sum() == len(train)
+    assert tl.loc[tl.period == "Holdout", "transactions"].sum() == len(hold)
+    assert tl.loc[tl.period == "Fitting", "step"].max() == cut
+
+
 def test_feature_and_model_code_never_reads_either_label_column():
     for mod in (features, models):
         src = inspect.getsource(mod)

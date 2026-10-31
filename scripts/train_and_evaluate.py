@@ -75,6 +75,9 @@ def main():
     log(f"loaded {len(df):,} rows ({source})")  # no label read before the evaluation stage
 
     train, holdout, cut = data.time_split(df)
+    # Transactions per step for the split timeline on the Data and models page.
+    # Uses only `step`, so writing it before the evaluation stage reads no label.
+    data.step_timeline(df["step"], cut).to_parquet(out / "timeline.parquet", index=False)
     del df  # the split made copies; free the full table so it is not held twice
     log(f"time split at step {cut}: train {len(train):,} rows, holdout {len(holdout):,} rows")
 

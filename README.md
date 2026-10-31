@@ -26,7 +26,7 @@ It's unsupervised on purpose. Operators rarely have clean, up-to-date fraud labe
 | `momosentry/evaluate.py` | ROC-AUC, **PR-AUC**, precision/recall/F1 at the alert threshold, precision@top-k. This is the only module that reads the label |
 | `momosentry/explain.py` | Perturbation explanations: "how much does the score drop if this part of the transaction were typical?" |
 | `scripts/train_and_evaluate.py` | End-to-end pipeline that writes everything in `artifacts/` |
-| `streamlit_app.py` + `views/` | Dashboard: **Overview**, **Score a transaction**, **Flagged transactions**, **Model comparison** |
+| `streamlit_app.py` + `views/` | Dashboard, in functional-requirement order: **Data and models** (FR1, FR2), **Score a transaction** (FR3, FR4), **Flagged transactions** (FR5), **Model comparison** (FR6, FR7), **Overview** (FR8) |
 | `tests/` | Feature unit tests, leakage guards, an end-to-end pipeline test, and a render test for every dashboard page |
 
 ## Evaluation protocol (no label leakage)

@@ -2,7 +2,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from momosentry.features import EXPLAIN_GROUPS
 from app_common import (
     COLORS,
     MUTED,
@@ -13,31 +12,6 @@ from app_common import (
     source_banner,
     style,
 )
-
-
-def method_section(m: dict):
-    """Shows how the data was split and which features the models saw (from metrics.json)."""
-    st.subheader("Data split and features")
-    run = m.get("run")
-    if run is None:  # metrics.json written before the run facts existed
-        st.info("Re-run `python scripts/train_and_evaluate.py` to record the split and feature details.")
-        return
-    meta = m["meta"]
-    a, b = run["train_steps"], run["holdout_steps"]
-    c = st.columns(4)
-    c[0].metric("Fitting rows", f"{meta['train_rows']:,}", help=f"Steps {a[0]} to {a[1]}")
-    c[1].metric("Holdout rows", f"{meta['holdout_rows']:,}", help=f"Steps {b[0]} to {b[1]}")
-    c[2].metric("Features per transaction", len(run["feature_names"]))
-    c[3].metric("Fraud rate: fitting / holdout", f"{meta['train_fraud_rate']:.3%} / {meta['holdout_fraud_rate']:.3%}")
-    st.caption(f"The split is by time (fitting steps {a[0]}-{a[1]}, holdout steps {b[0]}-{b[1]}) and is made "
-               "before any scaling or model fitting. The fraud label is first used in the " + run["label_first_used"] + ".")
-
-    group_of = {col: group for group, cols in EXPLAIN_GROUPS.items() for col in cols}
-    table = pd.DataFrame({"Feature": run["feature_names"],
-                          "Explanation group": [group_of.get(f, "Context (never reset)") for f in run["feature_names"]]})
-    st.dataframe(table, hide_index=True, width="stretch", height=300)
-    st.caption("`isFraud` and `isFlaggedFraud` are not features. The explanation resets one group at a time; "
-               "transaction type and the merchant flag are context and are never reset.")
 
 
 def page_overview():
@@ -89,7 +63,6 @@ def page_overview():
     st.dataframe(table, hide_index=True, width="stretch")
     st.caption("Alerts on types that contain no fraud add review workload without catching fraud. In PaySim each "
                "fraud is a TRANSFER followed by a CASH_OUT, so performance is shown for each leg separately.")
-    method_section(m)
 
 
 page_overview()

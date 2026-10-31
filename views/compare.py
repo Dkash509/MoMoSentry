@@ -61,43 +61,6 @@ def overlap_section(m: dict):
                "flagged by both ÷ rows flagged by either (1 = identical alerts, 0 = no overlap).")
 
 
-def model_cards(m: dict):
-    """How each detector was fitted and calibrated (from metrics.json)."""
-    st.subheader("How each detector was fitted")
-    run = m.get("run")
-    if run is None:
-        st.info(RERUN_HINT)
-        return
-    cmp = m["comparison_set"]
-    iso, lof = run["isolation_forest"], run["local_outlier_factor"]
-    p = m["meta"]["alert_rate"]
-    left, right = st.columns(2)
-    with left:
-        st.markdown("**Isolation Forest**")
-        st.write(f"Fitted without labels on {iso['fit_rows']:,} fitting rows. "
-                 f"{iso['params']['n_estimators']} trees, {iso['params']['max_samples']} rows per tree, "
-                 f"so at most {iso['max_rows_seen']:,} distinct rows are seen.")
-        st.write(f"Alert threshold {iso['threshold']:.4f}: the {100 * (1 - p):.1f}th percentile of "
-                 f"{iso['calibration_rows']:,} fitting scores.")
-        n = cmp["Isolation Forest"]
-        st.metric("Alerts on the holdout", f"{n['tp'] + n['fp']:,}", help=f"{n['alert_rate']:.2%} of holdout traffic")
-    with right:
-        st.markdown("**Local Outlier Factor**")
-        st.write(f"Fitted without labels on a sample of {lof['fit_rows']:,} fitting rows, drawn in proportion to "
-                 f"transaction type. {lof['params']['n_neighbors']} neighbours, novelty mode.")
-        st.write(f"Alert threshold {lof['threshold']:.4f}: the {100 * (1 - p):.1f}th percentile of "
-                 f"{lof['calibration_rows']:,} other fitting rows (no overlap with the fitting sample).")
-        n = cmp["Local Outlier Factor"]
-        st.metric("Alerts on the holdout", f"{n['tp'] + n['fp']:,}", help=f"{n['alert_rate']:.2%} of holdout traffic")
-    st.warning(f"Limitation: Local Outlier Factor is fitted on {lof['fit_rows']:,} of the {iso['fit_rows']:,} "
-               "fitting rows because its nearest-neighbour search is too costly for the full set. "
-               "Isolation Forest is fitted on the full set, so the two are not fitted on the same amount of data.")
-    mix = pd.DataFrame([{"Type": t, "Fitting share": v["train_share"], "LOF sample share": v["lof_sample_share"]}
-                        for t, v in lof["type_mix"].items()])
-    st.dataframe(mix, hide_index=True, width="stretch",
-                 column_config={c: st.column_config.NumberColumn(format="%.4f") for c in ("Fitting share", "LOF sample share")})
-
-
 def page_compare():
     st.title("Model comparison")
     m = load_json("metrics.json")
@@ -107,8 +70,8 @@ def page_compare():
     # every holdout row, the comparison set IS the holdout, so the caption must not call it a sample.
     scope = ("the whole holdout" if meta["comparison_rows"] == meta.get("holdout_rows")
              else "a uniform random sample of the holdout, so the fraud base rate is unchanged")
-    st.caption(f"All four methods are scored on the same {meta['comparison_rows']:,} holdout rows ({scope}).")
-    model_cards(m)
+    st.caption(f"All four methods are scored on the same {meta['comparison_rows']:,} holdout rows ({scope}). "
+               "How each detector was fitted is on the Data and models page.")
     cmp = m["comparison_set"]
     k = next(key for key in next(iter(cmp.values())) if key.startswith("precision_at_top_"))
     table = pd.DataFrame([{"Method": name, "ROC-AUC": v["roc_auc"], "PR-AUC": v["pr_auc"],

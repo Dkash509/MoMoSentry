@@ -62,16 +62,36 @@ def load(path=None) -> pd.DataFrame:
     return table.to_pandas(self_destruct=True, split_blocks=True)
 
 
+def split_step(max_step: int, train_frac=config.TRAIN_FRACTION_OF_STEPS) -> int:
+    """The last step of the fitting period. On PaySim: floor(743 * 0.70) = 520."""
+    return int(np.floor(max_step * train_frac))
+
+
 def time_split(df: pd.DataFrame, train_frac=config.TRAIN_FRACTION_OF_STEPS):
     """Split by `step` (hour). Everything before the cut is train, after is holdout.
 
     A random split would let the model 'see the future' (same accounts, same
     hours on both sides), which inflates results.
     """
-    cut = int(np.floor(df["step"].max() * train_frac))
+    cut = split_step(df["step"].max(), train_frac)
     train = df[df["step"] <= cut].reset_index(drop=True)
     holdout = df[df["step"] > cut].reset_index(drop=True)
     return train, holdout, cut
+
+
+def step_timeline(steps: pd.Series, cut: int) -> pd.DataFrame:
+    """Transactions per hourly step, and which side of the split each step is on.
+
+    Built from the `step` column alone, so it carries no label information.
+    The dashboard draws the split from this (FR1).
+    """
+    counts = steps.value_counts().sort_index()  # index = step, value = number of transactions
+    step = counts.index.to_numpy(dtype=int)
+    return pd.DataFrame({
+        "step": step,
+        "transactions": counts.to_numpy(dtype=int),
+        "period": np.where(step <= cut, "Fitting", "Holdout"),  # same <= rule as time_split
+    })
 
 
 def type_stratified_sample(df: pd.DataFrame, n: int, seed=config.RANDOM_STATE) -> pd.DataFrame:

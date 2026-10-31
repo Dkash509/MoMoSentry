@@ -60,5 +60,10 @@ def test_end_to_end(tmp_path, monkeypatch):
     lof = m["comparison_set"]["Local Outlier Factor"]
     assert int(exp["lof_alert"].sum()) == lof["tp"] + lof["fp"]
     assert run["export_rows"] == len(exp)
+
+    # A full run also writes the split timeline, and it agrees with the split it reports.
+    tl = pd.read_parquet(out / "timeline.parquet")
+    assert tl.loc[tl.period == "Fitting", "transactions"].sum() == m["meta"]["train_rows"]
+    assert tl.loc[tl.period == "Holdout", "transactions"].sum() == m["meta"]["holdout_rows"]
     ex = explain(bundle, exp.iloc[[0]], "if")
     assert len(ex) == 6 and abs(ex.share.sum() - 1) < 1e-6 or ex.share.sum() == 0
