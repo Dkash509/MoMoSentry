@@ -1,0 +1,91 @@
+@startuml erd_2
+' Figure 3.x: Logical data model. The system stores files, not database tables,
+' so these entities describe the stored data and how it is related.
+' House style: black and white, Times-compatible font, print resolution.
+skinparam monochrome true
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName "Liberation Serif"
+skinparam defaultFontSize 13
+skinparam roundCorner 4
+skinparam ArrowColor black
+skinparam BackgroundColor white
+hide circle
+hide empty methods
+skinparam linetype ortho
+
+entity "Transaction" as tx {
+  * tx_id : row key
+  --
+  step : int
+  type : text
+  amount : float
+  oldbalanceOrg : float
+  newbalanceOrig : float
+  nameDest : first letter only
+  oldbalanceDest : float
+  newbalanceDest : float
+  isFlaggedFraud : int
+  isFraud : int <<evaluation only>>
+}
+
+entity "FeatureVector" as fv {
+  * tx_id : row key
+  --
+  15 features (data dictionary)
+}
+
+entity "TypicalVector" as tv {
+  * type : text
+  --
+  median of each feature
+  in the fitting period
+}
+
+entity "RuleFlag" as rf {
+  * tx_id : row key
+  * rule : text
+  --
+  flagged : bool
+}
+
+entity "Model" as m {
+  * model_key : text
+  --
+  name : text
+  settings : text
+}
+
+entity "Calibration" as cal {
+  * model_key : text
+  --
+  threshold : float
+  sorted fitting scores
+}
+
+entity "Score" as sc {
+  * tx_id : row key
+  * model_key : text
+  --
+  anomaly_score : float
+  risk : float
+  alert : bool
+}
+
+entity "EvaluationResult" as ev {
+  * method : text
+  --
+  ROC-AUC, PR-AUC (raw, adjusted)
+  precision, recall, alert rate
+  budgets, overlap
+}
+
+tx ||--|| fv : has
+tx ||--o{ rf : has
+tx }o--|| tv : "type uses"
+fv ||--|{ sc : "is scored as"
+m ||--o{ sc : produces
+m ||--|| cal : has
+sc }o--|| ev : "summarised in"
+rf }o--|| ev : "summarised in"
+@enduml

@@ -1,0 +1,58 @@
+@startuml use_case
+' Figure 3.x: Use case diagram. Analyst use cases map to FR1-FR8 (Chapter 3);
+' maintainer use cases are the offline work in Detection and Evaluation Design.
+' House style: black and white, Times-compatible font, print resolution.
+skinparam monochrome true
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName "Liberation Serif"
+skinparam defaultFontSize 13
+skinparam roundCorner 4
+skinparam ArrowColor black
+skinparam BackgroundColor white
+left to right direction
+skinparam packageStyle rectangle
+skinparam nodesep 18
+skinparam ranksep 60
+
+actor "Fraud analyst" as analyst
+actor "Researcher / maintainer" as maint
+
+rectangle "MoMoSentry" {
+  usecase "View data split\nand features (FR1)" as UC1
+  usecase "View how each detector\nwas fitted (FR2)" as UC2
+  usecase "Score a\ntransaction (FR3)" as UC3
+  usecase "Review flagged\ntransactions (FR5)" as UC5
+  usecase "Compare methods\n(FR6)" as UC7
+  usecase "View holdout\noverview (FR8)" as UC10
+
+  usecase "View explanation\n(FR4)" as UC4
+  usecase "Export flagged\ntransactions (FR5)" as UC6
+  usecase "View alert-budget\nanalysis (FR7)" as UC8
+  usecase "View overlap\nof alerts (FR7)" as UC9
+
+  usecase "Prepare\ndataset" as MC1
+  usecase "Train and\nevaluate models" as MC2
+  usecase "Run automated\ntests" as MC3
+}
+
+analyst --> UC1
+analyst --> UC2
+analyst --> UC3
+analyst --> UC5
+analyst --> UC7
+analyst --> UC10
+
+' Optional behaviour: the extending use case points at the base use case.
+UC3 <.. UC4 : <<extend>>
+UC5 <.. UC4 : <<extend>>
+UC5 <.. UC6 : <<extend>>
+' Always-present behaviour: the base use case points at what it includes.
+UC7 ..> UC8 : <<include>>
+UC7 ..> UC9 : <<include>>
+
+' Written base-first so the layout puts the maintainer on the right-hand side.
+MC1 <-- maint
+MC2 <-- maint
+MC3 <-- maint
+@enduml

@@ -1,0 +1,33 @@
+@startuml activity_pipeline
+' Figure 3.x: Activity diagram of the offline pipeline (scripts/train_and_evaluate.py).
+' The fraud label is first read in Stage 3.
+' House style: black and white, Times-compatible font, print resolution.
+skinparam monochrome true
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName "Liberation Serif"
+skinparam defaultFontSize 13
+skinparam roundCorner 4
+skinparam ArrowColor black
+skinparam BackgroundColor white
+skinparam ActivityFontSize 13
+
+start
+partition "Stage 1: split and Isolation Forest (no labels)" {
+  :Load PaySim without the origin identifier; destination identifier cut to its first letter;
+  :Split by time at step 520 (fitting 1-520, holdout 521-743); write transactions per step;
+  :Build the 15 features for both periods;
+  :Fit Isolation Forest on all fitting rows; threshold = 99.5th percentile of 200,000 fitting scores;
+}
+partition "Stage 2: Local Outlier Factor (no labels)" {
+  :Fit Local Outlier Factor (novelty mode) on 100,000 fitting rows drawn by transaction type;
+  :Threshold = 99.5th percentile of 50,000 other fitting rows;
+  :Store median features per type for the explainer; save the fitted models;
+}
+partition "Stage 3: evaluation (fraud label used from here)" {
+  :Score the holdout with both detectors; compute the two rule flags;
+  :ROC-AUC, PR-AUC, precision and recall at the threshold, at five budgets, and overlap;
+  :Write metrics, curves and dashboard files (no account identifiers);
+}
+stop
+@enduml

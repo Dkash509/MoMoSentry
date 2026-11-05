@@ -1,0 +1,49 @@
+@startuml sequence_score
+' Figure 3.x: Sequence diagram for scoring one transaction (views/score.py,
+' Bundle.score_raw in momosentry/models.py, explain() in momosentry/explain.py).
+' House style: black and white, Times-compatible font, print resolution.
+skinparam monochrome true
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName "Liberation Serif"
+skinparam defaultFontSize 13
+skinparam roundCorner 4
+skinparam ArrowColor black
+skinparam BackgroundColor white
+skinparam sequenceMessageAlign left
+hide footbox
+
+actor "Fraud analyst" as A
+participant "Score page" as P
+participant "Explainer" as E
+participant "Model bundle" as B
+participant "Feature\nbuilder" as F
+participant "Isolation\nForest" as IF
+participant "Local Outlier\nFactor" as LOF
+
+A -> P : enter fields, press Score
+P -> B : score the transaction
+B -> F : build features
+F --> B : 15 features
+B -> IF : score features
+IF --> B : raw score
+B -> LOF : score features
+LOF --> B : raw score
+B -> B : negate each score;\nrisk = percentile of\nfitting scores;\nalert if above threshold
+B --> P : risk and alert status per detector
+P --> A : show risk and alert status
+
+opt analyst asks for an explanation
+  A -> P : choose a detector
+  P -> E : explain the transaction
+  E -> B : score the transaction (base score)
+  E -> E : load median features\nfor the type
+  loop for each of the six feature groups
+    E -> E : reset group\nto typical value
+    E -> B : score the changed transaction
+    E -> E : drop =\nbase - new
+  end
+  E --> P : drop and share for each group
+  P --> A : chart of the drop for each group
+end
+@enduml

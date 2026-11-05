@@ -1,0 +1,50 @@
+@startuml architecture
+' Figure 3.x: System architecture. Top row: offline pipeline. Middle: GitHub.
+' Bottom row: serving. Dashed lines mark the planned hosting, which is not yet live.
+' House style: black and white, Times-compatible font, print resolution.
+skinparam monochrome true
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName "Liberation Serif"
+skinparam defaultFontSize 13
+skinparam roundCorner 4
+skinparam ArrowColor black
+skinparam BackgroundColor white
+top to bottom direction
+skinparam nodesep 30
+skinparam ranksep 55
+
+rectangle "Offline pipeline (development laptop)" {
+  file "PaySim CSV\n(not in Git)" as csv
+  component "prepare_data.py" as prep
+  file "paysim.parquet" as pq
+  component "train_and_evaluate.py\n(split, fit without labels,\nthresholds, evaluate)" as train
+  folder "artifacts/\n(about 21 MB)" as art
+}
+
+rectangle "GitHub" {
+  database "Repository\n(code and artifacts)" as repo
+  component "GitHub Actions\n(tests on every push)" as ci
+}
+
+rectangle "Serving" {
+  node "Streamlit Community\nCloud (planned host)" as host
+  component "Streamlit dashboard\n(five pages)" as dash
+  component "momosentry\npackage" as pkg
+}
+
+actor "Fraud analyst" as analyst
+
+' Single-dash arrows run sideways, double-dash arrows run down a row.
+csv -> prep
+prep -> pq
+pq -> train
+train -> art
+art --> repo : git push
+repo -> ci : runs tests
+repo ..> host : deploys\n(planned)
+host -> dash : runs
+dash -> pkg : imports
+repo --> dash : artifacts\nloaded
+analyst -up-> dash : browser\n(HTTPS)
+@enduml
