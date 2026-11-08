@@ -1,0 +1,40 @@
+@startuml architecture_layered
+' Figure 3.x (alternative): Layered view of the system. The offline pipeline fills the
+' data layer once; the dashboard only reads it. There is no database server and no
+' separate web API: Streamlit runs the Python code in the same process as the pages.
+' House style: black and white, Times-compatible font, print resolution.
+skinparam monochrome true
+skinparam shadowing false
+skinparam dpi 200
+skinparam defaultFontName "Liberation Serif"
+skinparam defaultFontSize 13
+skinparam roundCorner 4
+skinparam ArrowColor black
+skinparam BackgroundColor white
+left to right direction
+skinparam nodesep 35
+skinparam ranksep 70
+
+actor "Fraud\nanalyst" as analyst
+
+rectangle "Presentation layer\n(web browser)" as pres {
+  rectangle "Streamlit pages\n1 Data and models\n2 Score a transaction\n3 Flagged transactions\n4 Model comparison\n5 Overview" as pages
+}
+
+rectangle "Application layer\n(Streamlit server, Python)" as app {
+  rectangle "momosentry package\nmodel bundle (IF, LOF, thresholds)\nfeature builder\nexplainer" as pkg
+}
+
+rectangle "Data layer\n(files in artifacts/, no database)" as data {
+  rectangle "metrics.json\nscored holdout, curves,\nhourly, timeline (Parquet)\nmodel_bundle.joblib" as files
+}
+
+rectangle "Offline pipeline\n(run once, before deployment)" as offline {
+  rectangle "prepare_data.py\ntrain_and_evaluate.py\n(fit without labels, evaluate)" as scripts
+}
+
+analyst --> pages : uses
+pages --> pkg : HTTPS\n(page request, form input)
+pkg --> files : loads once\nand caches
+scripts --> files : writes
+@enduml
