@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 ARTIFACTS_DIR = ROOT / "artifacts"
 
-RAW_CSV = DATA_DIR / "PS_20174392719_1491204439457_log.csv"  # Kaggle file name
+RAW_CSV = DATA_DIR / "paysim.csv"  # the Kaggle download, renamed
 PARQUET = DATA_DIR / "paysim.parquet"
 SAMPLE_PARQUET = DATA_DIR / "paysim_sample.parquet"  # synthetic, for dev/CI
 

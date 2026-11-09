@@ -2,7 +2,7 @@
 
 1. Download "Synthetic Financial Datasets For Fraud Detection" (ealaxi/paysim1)
    from Kaggle and put the CSV in data/.
-2. python scripts/prepare_data.py                      # default Kaggle file name
+2. python scripts/prepare_data.py                      # default data/paysim.csv
    python scripts/prepare_data.py --csv data/paysim.csv  # any other name
 """
 import argparse
