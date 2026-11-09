@@ -11,11 +11,11 @@ Isolation Forest vs Local Outlier Factor on the PaySim mobile money dataset, eva
 
 ## Why
 
-Mobile money is the main way many people in Zambia move money, and most published work on mobile money fraud detection comes from Ghana, Kenya and Tanzania. Real operator data isn't public, so this project uses **PaySim**, a synthetic dataset modelled on an African mobile money service. It asks one question:
+Mobile money is widely used in Zambia, and the mobile money fraud detection work I found comes mostly from other African countries such as Ghana, Kenya and Tanzania (sources to be added in the project report). Real operator data isn't public, so this project uses **PaySim**, a synthetic dataset modelled on an African mobile money service. It asks one question:
 
 > **Can unsupervised anomaly detection, trained without any fraud labels, surface fraudulent mobile money transactions at a review rate an analyst can actually handle, and which of Isolation Forest or Local Outlier Factor does it better?**
 
-It's unsupervised on purpose. Operators rarely have clean, up-to-date fraud labels, and new fraud patterns don't look like old labelled ones.
+It's unsupervised on purpose, on the assumption that operators often lack clean, up-to-date fraud labels and that new fraud patterns may not resemble old labelled ones.
 
 ## What's in it
 
@@ -34,13 +34,13 @@ It's unsupervised on purpose. Operators rarely have clean, up-to-date fraud labe
 1. **Time split** on `step` (hours): train on the first 70% of hours and test on the last 30%. A random split would leak future behaviour into training.
 2. **No labels in training.** `isFraud` and `isFlaggedFraud` are never features, and a test enforces this.
 3. **`contamination="auto"`.** The models aren't told the fraud rate.
-4. **Thresholds come from train scores only.** The alert threshold is the 99.5th percentile of *training-period* scores (an analyst budget of 0.5% of traffic), then applied unchanged to the holdout.
-5. **LOF scalability.** LOF is fitted on a 100k-row sample of the training period, stratified by **transaction type** (never by label), and calibrated on *different* training rows because novelty-LOF scores are biased on its own fit data.
-6. **Fair comparison.** Every method is scored on the same uniform random holdout sample, which keeps the fraud base rate intact. Keeping "all fraud + some normals" would inflate PR-AUC.
-7. **Baseline.** PaySim's built-in `isFlaggedFraud` rule.
+4. **Thresholds come from train scores only.** The alert threshold is the 99.5th percentile of *training-period* scores (an analyst budget of 0.5% of traffic), then applied unchanged to the holdout. The 0.5% figure is an assumed budget set in `momosentry/config.py`, not a sourced review capacity. On the holdout Isolation Forest exceeded it, alerting on 0.95% of traffic (2,659 alerts). The main cause is the higher fraud share: fraud rises from 0.095% to 0.867% of traffic, and 1,218 of the alerts (0.43% of all holdout traffic) are true fraud. The other 1,441 are false alarms, 0.51% of traffic, close to the 0.5% the threshold was set for.
+5. **LOF scalability.** LOF is fitted on a 100k-row sample (of 6,082,007 training rows) of the training period, stratified by **transaction type** (never by label), and calibrated on *different* training rows because scikit-learn's novelty-mode LOF is not meant to score its own training data ([scikit-learn `LocalOutlierFactor` documentation](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.LocalOutlierFactor.html)).
+6. **Same evaluation set.** Every method is scored on the same full holdout (280,613 rows, nothing subsampled), so the fraud base rate is intact. Keeping "all fraud + some normals" would inflate PR-AUC. Training data is not equal across models (see Limitations).
+7. **Baselines.** Two rule-based baselines: PaySim's built-in `isFlaggedFraud` rule, and a balance-drain rule (flags transactions that drain the sender's account).
 8. **Nothing is tuned on the holdout.** All settings live in `momosentry/config.py`.
 
-PR-AUC is the headline metric. With roughly 0.13% fraud, ROC-AUC can look excellent while almost every alert is a false alarm.
+PR-AUC is the headline metric. With fraud at 0.095% of the training period and 0.867% of the holdout, ROC-AUC can look excellent while almost every alert is a false alarm.
 
 ## Quick start
 
@@ -54,7 +54,7 @@ python scripts/make_sample_data.py
 python scripts/train_and_evaluate.py
 
 # Option B: real PaySim (do this for the actual results)
-#   1. Download ealaxi/paysim1 from Kaggle and put the CSV in data/
+#   1. Download ealaxi/paysim1 from Kaggle and save the CSV as data/paysim.csv (the filename the scripts expect)
 #   2. Convert it and train:
 python scripts/prepare_data.py
 python scripts/train_and_evaluate.py --data data/paysim.parquet
@@ -71,27 +71,33 @@ The raw CSV (about 470 MB) is **never committed**. The app only reads `artifacts
 2. Commit `artifacts/`.
 3. Deploy `streamlit_app.py` from the repo on share.streamlit.io.
 
+`requirements.txt` is pinned on purpose: the model bundle was pickled under those library versions and may not load under others.
+
 ## Results (real PaySim, 6,362,620 transactions)
 
 Train: steps 1–520 (6,082,007 rows, 0.095% fraud). Holdout: steps 521–743 (280,613 rows, 0.867% fraud).
-All three methods are scored on the full holdout. The alert threshold is the top 0.5% of training-period scores.
+All four methods are scored on the full holdout. The alert threshold is the top 0.5% of training-period scores.
 
 | Method | ROC-AUC | PR-AUC | PR-AUC (adj.) | Precision @ alert | Precision @ alert (adj.) | Recall @ alert | Precision @ top 1000 |
 |---|---|---|---|---|---|---|---|
 | **Isolation Forest** | **0.941** | **0.538** | **0.486** | 0.458 | 0.084 | **0.501** | **0.994** |
 | Local Outlier Factor | 0.654 | 0.081 | 0.010 | 0.196 | 0.026 | 0.208 | 0.142 |
 | `isFlaggedFraud` rule | 0.502 | 0.013 | 0.005 | 1.000 | 1.000 | 0.004 | 0.024 |
+| Balance-drain rule | 0.857 | 0.031 | 0.004 | 0.032 | 0.004 | 0.970 | 0.016 |
+
+The balance-drain rule alerts on 26.2% of all holdout traffic; Isolation Forest alerts on 0.95%.
 
 **(adj.)** In PaySim, normal traffic collapses after about step 400 while fraud continues at the same pace, so the holdout fraud rate is about 9× the training rate. That inflates raw precision and PR-AUC. The adjusted columns re-weight normal rows back to the training-period fraud rate (0.095%), and those are the figures to quote. Recall and ROC-AUC don't depend on prevalence.
 
 **Findings**
 
-1. **Isolation Forest clearly beats LOF**, with roughly 48× the adjusted PR-AUC. LOF's local-density view struggles with PaySim's heavy-tailed amounts and mixed transaction types, even with scaling.
-2. **IF catches one leg of the fraud, not the other.** On holdout TRANSFERs it flags **100% of fraud at 98.9% precision**. On the matching CASH_OUTs it catches **0.16%**. The cash-out leg moves money out of a mule account with consistent balances, so on its own it looks normal. Catching it needs account-level context (e.g. "this account just received a drained-account transfer"), which a per-transaction detector cannot see. That is the main direction for future work.
+1. **Isolation Forest clearly beats LOF**, with about 47× the adjusted PR-AUC (0.486 vs 0.010). The gap may partly reflect unequal training data (see Limitations). A further possible cause is that LOF's local-density view struggles with PaySim's heavy-tailed amounts and mixed transaction types. Neither explanation was tested.
+2. **IF catches one leg of the fraud, not the other.** On holdout TRANSFERs it flags **100% of fraud at 98.9% precision**. On the matching CASH_OUTs it catches **0.16%**. Our interpretation is that the cash-out leg moves money out of an account whose balances are consistent, so on its own it looks normal. Catching it needs account-level context (e.g. "this account just received a drained-account transfer"), which a per-transaction detector cannot see. That is the main direction for future work.
 3. **False alarms come from types that never contain fraud.** DEBIT (12.9% of them alerted) and CASH_IN (1.6%) cause most of them. A production system would route these through type-specific thresholds.
-4. **PaySim's built-in rule is useless for detection.** It is perfectly precise but catches 0.4% of fraud.
+4. **PaySim's built-in rule is useless for detection.** It raised only 10 alerts on the holdout, all correct (precision 1.0), but that is just 0.4% of the fraud.
+5. **The balance-drain rule shows the opposite trade-off.** It catches 97% of fraud (recall 0.970) but flags 26.2% of all traffic, with precision 0.032. Isolation Forest catches about half the fraud while alerting on 0.95% of traffic. That is above the assumed 0.5% budget (protocol point 4) but about 28 times fewer alerts than the balance-drain rule.
 
-Reproduce with `python scripts/prepare_data.py --csv <your csv>` then `python scripts/train_and_evaluate.py --data data/paysim.parquet` (about 90 s on 2 CPU cores).
+Reproduce with `python scripts/prepare_data.py --csv <your csv>` then `python scripts/train_and_evaluate.py --data data/paysim.parquet`.
 
 ## Limitations
 
@@ -99,12 +105,10 @@ Reproduce with `python scripts/prepare_data.py --csv <your csv>` then `python sc
 - **Fraud is per-transaction here, but in reality it is per-account.** See finding 2.
 - **The features encode ledger consistency.** PaySim fraud has a known signature (accounts drained to zero, receiver balances that don't update). The ledger-mismatch features are generic checks a real operator would run, but they make the task easier on PaySim than it would be on messier real data.
 - **Unsupervised detectors flag "unusual", not "fraudulent".** Large legitimate transfers will also be flagged. The per-type breakdown on the Overview page shows where the alert budget is wasted.
-- **LOF is evaluated on a sample** for computational reasons. This is documented and applied equally to all methods.
+- **LOF is fitted on a sample** (100k of 6,082,007 training rows) for computational reasons, while Isolation Forest sees all training rows. All methods are scored on the same full holdout, but the models do not get equal training data, so part of the IF-over-LOF gap may come from this rather than from the algorithms themselves. Fitting IF on the same 100k stratified sample would test this; it has not been run.
 
 ## Related work
 
-- MoMoGuard: a mobile money analytics dashboard (Ghana context)
-- "AI-Powered Fraud Detection System" (P. Nandre): RF + XGBoost + Isolation Forest on PaySim with Streamlit
 - Lopez-Rojas, Elmir & Axelsson (2016), *PaySim: A financial mobile money simulator for fraud detection*
 
 The PaySim dataset (Kaggle: ealaxi/paysim1) is by E. A. Lopez-Rojas and is licensed CC BY-SA 4.0. `artifacts/holdout_scored.parquet` contains a derived sample of it, with customer ids removed.
