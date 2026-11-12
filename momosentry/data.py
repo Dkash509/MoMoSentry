@@ -21,7 +21,6 @@ PAYSIM_DTYPES = {
     "isFraud": "int8",
     "isFlaggedFraud": "int8",
 }
-LABEL = "isFraud"
 
 
 def csv_to_parquet(csv_path=config.RAW_CSV, out_path=config.PARQUET) -> pd.DataFrame:

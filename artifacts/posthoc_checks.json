@@ -1,0 +1,232 @@
+{
+ "meta": {
+  "split_step": 520,
+  "reference_rate": 0.0009505086067806235
+ },
+ "normal_type_mix": {
+  "CASH_IN": {
+   "fit": 0.21978280597199643,
+   "holdout": 0.2294693023606932
+  },
+  "CASH_OUT": {
+   "fit": 0.35288960614697346,
+   "holdout": 0.32046401443664374
+  },
+  "DEBIT": {
+   "fit": 0.006441169238932193,
+   "holdout": 0.008246429482962532
+  },
+  "PAYMENT": {
+   "fit": 0.33798775753238935,
+   "holdout": 0.3515876353884701
+  },
+  "TRANSFER": {
+   "fit": 0.08289866110970856,
+   "holdout": 0.09023261833123039
+  }
+ },
+ "if_global": {
+  "roc_auc": 0.9410077606018157,
+  "pr_auc": 0.5382235374823863,
+  "pr_auc_adj": 0.4864248993857307,
+  "precision_at_threshold": 0.45806694245957125,
+  "precision_at_threshold_adj": 0.08423636988278992,
+  "recall_at_threshold": 0.5008223684210527,
+  "tp": 1218,
+  "fp": 1441,
+  "alerts": 2659,
+  "alert_rate": 0.009475683592705968,
+  "by_type": {
+   "CASH_IN": {
+    "alerts": 1003,
+    "fraud": 0,
+    "tp": 0
+   },
+   "CASH_OUT": {
+    "alerts": 2,
+    "fraud": 1216,
+    "tp": 2
+   },
+   "DEBIT": {
+    "alerts": 295,
+    "fraud": 0,
+    "tp": 0
+   },
+   "PAYMENT": {
+    "alerts": 130,
+    "fraud": 0,
+    "tp": 0
+   },
+   "TRANSFER": {
+    "alerts": 1229,
+    "fraud": 1216,
+    "tp": 1216
+   }
+  }
+ },
+ "if_per_type_thresholds": {
+  "CASH_IN": 0.6306304973231496,
+  "CASH_OUT": 0.5617453782885398,
+  "DEBIT": 0.6509032631556493,
+  "PAYMENT": 0.5999653789839189,
+  "TRANSFER": 0.6504307169308653
+ },
+ "if_per_type": {
+  "roc_auc": 0.9866704514752701,
+  "pr_auc": 0.6552218977784809,
+  "pr_auc_adj": 0.34416525337160075,
+  "precision_at_threshold": 0.605475040257649,
+  "precision_at_threshold_adj": 0.1431127664920092,
+  "recall_at_threshold": 0.618421052631579,
+  "tp": 1504,
+  "fp": 980,
+  "alerts": 2484,
+  "alert_rate": 0.00885204890721385,
+  "by_type": {
+   "CASH_IN": {
+    "alerts": 251,
+    "fraud": 0,
+    "tp": 0
+   },
+   "CASH_OUT": {
+    "alerts": 528,
+    "fraud": 1216,
+    "tp": 463
+   },
+   "DEBIT": {
+    "alerts": 2,
+    "fraud": 0,
+    "tp": 0
+   },
+   "PAYMENT": {
+    "alerts": 662,
+    "fraud": 0,
+    "tp": 0
+   },
+   "TRANSFER": {
+    "alerts": 1041,
+    "fraud": 1216,
+    "tp": 1041
+   }
+  }
+ },
+ "if_ablated": {
+  "roc_auc": 0.9689696379170207,
+  "pr_auc": 0.3088391732390846,
+  "pr_auc_adj": 0.05482528803771533,
+  "precision_at_threshold": 0.36996466431095404,
+  "precision_at_threshold_adj": 0.060065600943787115,
+  "recall_at_threshold": 0.43050986842105265,
+  "tp": 1047,
+  "fp": 1783,
+  "alerts": 2830,
+  "alert_rate": 0.010085063771101126,
+  "by_type": {
+   "CASH_IN": {
+    "alerts": 10,
+    "fraud": 0,
+    "tp": 0
+   },
+   "CASH_OUT": {
+    "alerts": 243,
+    "fraud": 1216,
+    "tp": 239
+   },
+   "DEBIT": {
+    "alerts": 934,
+    "fraud": 0,
+    "tp": 0
+   },
+   "PAYMENT": {
+    "alerts": 342,
+    "fraud": 0,
+    "tp": 0
+   },
+   "TRANSFER": {
+    "alerts": 1301,
+    "fraud": 1216,
+    "tp": 808
+   }
+  },
+  "threshold": 0.6213235010353708
+ },
+ "rule_transfer_dest_zero": {
+  "roc_auc": 0.75,
+  "pr_auc": 0.5043333701574767,
+  "pr_auc_adj": 0.500475254303389,
+  "precision_at_threshold": 1.0,
+  "precision_at_threshold_adj": 1.0,
+  "recall_at_threshold": 0.5,
+  "tp": 1216,
+  "fp": 0,
+  "alerts": 1216,
+  "alert_rate": 0.004333370157476668,
+  "by_type": {
+   "CASH_IN": {
+    "alerts": 0,
+    "fraud": 0,
+    "tp": 0
+   },
+   "CASH_OUT": {
+    "alerts": 0,
+    "fraud": 1216,
+    "tp": 0
+   },
+   "DEBIT": {
+    "alerts": 0,
+    "fraud": 0,
+    "tp": 0
+   },
+   "PAYMENT": {
+    "alerts": 0,
+    "fraud": 0,
+    "tp": 0
+   },
+   "TRANSFER": {
+    "alerts": 1216,
+    "fraud": 1216,
+    "tp": 1216
+   }
+  }
+ },
+ "lof_300k": {
+  "roc_auc": 0.6933781829368857,
+  "pr_auc": 0.042396511104965985,
+  "pr_auc_adj": 0.004903477736096074,
+  "precision_at_threshold": 0.0803639120545868,
+  "precision_at_threshold_adj": 0.009420357983518887,
+  "recall_at_threshold": 0.08717105263157894,
+  "tp": 212,
+  "fp": 2426,
+  "alerts": 2638,
+  "alert_rate": 0.009400847430446915,
+  "by_type": {
+   "CASH_IN": {
+    "alerts": 732,
+    "fraud": 0,
+    "tp": 0
+   },
+   "CASH_OUT": {
+    "alerts": 1181,
+    "fraud": 1216,
+    "tp": 205
+   },
+   "DEBIT": {
+    "alerts": 48,
+    "fraud": 0,
+    "tp": 0
+   },
+   "PAYMENT": {
+    "alerts": 338,
+    "fraud": 0,
+    "tp": 0
+   },
+   "TRANSFER": {
+    "alerts": 339,
+    "fraud": 1216,
+    "tp": 7
+   }
+  },
+  "threshold": 1.79606032371521
+ }
+}
