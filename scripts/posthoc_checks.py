@@ -6,7 +6,8 @@ These checks were run after the main results, because the results raised
 questions a short run could answer. They change no model, threshold or
 dashboard file; they only write artifacts/posthoc_checks.json.
 
-Fitting and thresholds still use no label. Labels are read only to evaluate.
+Fitting and thresholds still use no label. Labels are read only after the
+evaluation marker, as in train_and_evaluate.py.
 The receiver-balance pattern was found by looking at holdout labels, so every
 check here is post-hoc and is kept out of the headline results.
 """
@@ -55,48 +56,29 @@ def main():
     t_tr = train["type"].astype(str).to_numpy()
     t_ho = hold["type"].astype(str).to_numpy()
 
-    # ---------------- Evaluation (labels used from here on) ----------------
-    y_tr = train["isFraud"].to_numpy()
-    y = hold["isFraud"].to_numpy()
-    r = float(y_tr.mean())
-    res = {"meta": {"split_step": int(cut), "reference_rate": r}}
-
-    # 0. Type mix of normal transactions in each period: the assumption behind
-    #    the single prevalence weight.
-    mix_tr = pd.Series(t_tr[y_tr == 0]).value_counts(normalize=True)
-    mix_ho = pd.Series(t_ho[y == 0]).value_counts(normalize=True)
-    res["normal_type_mix"] = {t: {"fit": float(mix_tr.get(t, 0)), "holdout": float(mix_ho.get(t, 0))}
-                              for t in config.TX_TYPES}
-
-    # 1. Committed Isolation Forest, global threshold (reproduces metrics.json),
-    #    then one threshold per type: the 99.5th percentile of that type's
-    #    scores on 500,000 random fitting rows. No label sets a threshold.
+    # 1. Committed Isolation Forest, then one threshold per type: the 99.5th
+    #    percentile of that type's scores on 500,000 random fitting rows.
     rng = np.random.default_rng(config.RANDOM_STATE)
     cal_idx = rng.choice(len(train), size=500_000, replace=False)
     bundle = Bundle.load()
     iso = bundle.models["if"]
     s_ho = anomaly_score(iso, X_ho)
     s_cal = anomaly_score(iso, X_tr.iloc[cal_idx])
-    res["if_global"] = summary(y, s_ho, bundle.calibration["if"].threshold, r, t_ho)
     thr_t = {t: float(np.quantile(s_cal[t_tr[cal_idx] == t], 1 - config.ALERT_RATE)) for t in config.TX_TYPES}
     thr_row = np.array([thr_t[t] for t in t_ho])
-    res["if_per_type_thresholds"] = thr_t
-    res["if_per_type"] = summary(y, s_ho - thr_row, 0.0, r, t_ho)
-    log("per-type thresholds done")
+    log("per-type thresholds set")
 
     # 2. Ablation: Isolation Forest refitted without the receiver-balance
     #    features, same settings, threshold by the same 99.5th-percentile rule.
     keep = [c for c in FEATURE_NAMES if c not in RECEIVER_FEATURES]
     iso_ab = make_isolation_forest().fit(X_tr[keep])
     cal_ab = Calibration.from_train_scores(anomaly_score(iso_ab, X_tr[keep].iloc[cal_idx[:200_000]]))
-    res["if_ablated"] = summary(y, anomaly_score(iso_ab, X_ho[keep]), cal_ab.threshold, r, t_ho)
-    res["if_ablated"]["threshold"] = cal_ab.threshold
-    log("ablation done")
+    s_ho_ab = anomaly_score(iso_ab, X_ho[keep])
+    log("ablation fitted")
 
     # 3. Label-free rule written after the pattern was seen: a TRANSFER whose
     #    receiver shows a zero balance before and after.
     rule = ((t_ho == "TRANSFER") & (X_ho["dest_zero_both"].to_numpy() == 1)).astype(float)
-    res["rule_transfer_dest_zero"] = summary(y, rule, 0.5, r, t_ho)
 
     # 4. Local Outlier Factor fitted on 300,000 rows instead of 100,000, with
     #    the same type-stratified sampling and 50,000 separate calibration rows.
@@ -106,9 +88,30 @@ def main():
     remaining = np.setdiff1d(np.arange(len(train)), fit_rows)
     cal_rows = rng_lof.choice(remaining, size=50_000, replace=False)
     cal_lof = Calibration.from_train_scores(anomaly_score(lof, X_tr.iloc[cal_rows]))
-    res["lof_300k"] = summary(y, anomaly_score(lof, X_ho), cal_lof.threshold, r, t_ho)
+    s_ho_lof = anomaly_score(lof, X_ho)
+    log("LOF 300k fitted")
+
+    # ---------------- Evaluation (labels used from here on) ----------------
+    y_tr = train["isFraud"].to_numpy()
+    y = hold["isFraud"].to_numpy()
+    r = float(y_tr.mean())
+    res = {"meta": {"split_step": int(cut), "reference_rate": r}}
+
+    # Type mix of normal transactions in each period: the assumption behind
+    # the single prevalence weight.
+    mix_tr = pd.Series(t_tr[y_tr == 0]).value_counts(normalize=True)
+    mix_ho = pd.Series(t_ho[y == 0]).value_counts(normalize=True)
+    res["normal_type_mix"] = {t: {"fit": float(mix_tr.get(t, 0)), "holdout": float(mix_ho.get(t, 0))}
+                              for t in config.TX_TYPES}
+
+    res["if_global"] = summary(y, s_ho, bundle.calibration["if"].threshold, r, t_ho)
+    res["if_per_type_thresholds"] = thr_t
+    res["if_per_type"] = summary(y, s_ho - thr_row, 0.0, r, t_ho)
+    res["if_ablated"] = summary(y, s_ho_ab, cal_ab.threshold, r, t_ho)
+    res["if_ablated"]["threshold"] = cal_ab.threshold
+    res["rule_transfer_dest_zero"] = summary(y, rule, 0.5, r, t_ho)
+    res["lof_300k"] = summary(y, s_ho_lof, cal_lof.threshold, r, t_ho)
     res["lof_300k"]["threshold"] = cal_lof.threshold
-    log("LOF 300k done")
 
     out = config.ARTIFACTS_DIR / "posthoc_checks.json"
     out.write_text(json.dumps(res, indent=1))
